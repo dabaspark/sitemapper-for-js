@@ -16,27 +16,31 @@
  * /
  */
 
-const fs = require('fs');
+const fs = require('fs').promises;
 const log = require('./log');
 
-const FilesService = {
-    createXml(hrefs) {
-        let str = `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">`;
-        hrefs.forEach((href) => {
-            str = str + `
-<url>
-    <loc>${href}</loc>
-    <changefreq>weekly</changefreq>
-</url>
-`;
-        });
+const filesService = {
+    async createXml(links) {
+        try {
+            const xmlStart = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
+            const xmlEnd = '</urlset>';
+            
+            let xmlContent = xmlStart;
+            links.forEach(link => {
+                xmlContent += `  <url>\n    <loc>${link}</loc>\n    <changefreq>weekly</changefreq>\n  </url>\n`;
+            });
+            xmlContent += xmlEnd;
 
-        str = str + '</urlset>';
-        log.log(`Creating sitemap for ${hrefs.length} links`);
-        fs.writeFileSync(`sitemap.xml`, str, 'utf-8');
-        fs.writeFileSync(`sitemap.json`, JSON.stringify({'hrefs': hrefs}), 'utf-8');
-        setTimeout(() => process.exit(), 0);
+            const urlCount = links.length;
+            await fs.writeFile('sitemap.xml', xmlContent);
+            log.log('Sitemap file created successfully');
+            log.log(`Total URLs in sitemap: ${urlCount}`);
+            return true;
+        } catch (error) {
+            console.error('Error creating sitemap:', error);
+            throw error;
+        }
     }
-}
+};
 
-module.exports = FilesService;
+module.exports = filesService;

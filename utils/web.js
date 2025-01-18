@@ -19,25 +19,68 @@
 const puppeteer = require('puppeteer');
 const config = require('../config');
 
-process.on('unhandledrejection', () => {
-    console.log('unhandled error occured');
-});
+const webService = {
+    browser: null,
 
-const WebService = {
+    async initBrowser() {
+        if (!this.browser) {
+            this.browser = await puppeteer.launch({
+                headless: true,
+                args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+            });
+        }
+        return this.browser;
+    },
 
-    async getWeb(url) {
+    async getWeb(url, retryCount = 0) {
+        let page;
         try {
-            const browser = await puppeteer.launch({ headless: true });
-            const page = await browser.newPage();
-            await page.setViewport({ width: 1920, height: 926 });
-            await page.goto(url, config.pageLoad);
-            const links = await page.$$eval('a', as => as.map(a => a.href));
-            return links;
-        } catch (e) {
+            const browser = await this.initBrowser();
+            page = await browser.newPage();
+            
+            await page.setDefaultNavigationTimeout(config.pageLoad.timeout);
+            await page.goto(url, {
+                waitUntil: ['networkidle2', 'domcontentloaded'],
+                timeout: config.pageLoad.timeout
+            });
+
+            await page.waitForSelector('a');
+
+            const hrefs = await page.evaluate(() => {
+                return Array.from(document.querySelectorAll('a[href]'))
+                    .map(a => a.href)
+                    .filter(href => href && 
+                           href.startsWith('http') && 
+                           !href.startsWith('javascript:'));
+            });
+
+            await page.close();
+            return hrefs;
+        } catch (error) {
+            if (page) await page.close();
+            
+            if (retryCount < (config.pageLoad.retryLimit || 3)) {
+                return await this.getWeb(url, retryCount + 1);
+            }
+            
+            console.error(`Error processing ${url}: ${error.message}`);
             return [];
         }
+    },
+
+    async cleanup() {
+        if (this.browser) {
+            await this.browser.close();
+            this.browser = null;
+        }
     }
+};
 
-}
+// Add cleanup on process exit
+process.on('exit', () => {
+    if (webService.browser) {
+        webService.cleanup();
+    }
+});
 
-module.exports = WebService;
+module.exports = webService;
