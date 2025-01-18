@@ -1,5 +1,31 @@
 # SITEMAP GENERATOR FOR SPA (SINGLE PAGE APPLICATION)
 
+> This is a fork of [Comcast/sitemapper-for-js](https://github.com/Comcast/sitemapper-for-js) with enhanced reliability, error handling, and modern JavaScript practices.
+
+### Why This Fork?
+
+This fork improves upon the original with:
+- Modern async/await patterns throughout the codebase
+- Improved browser resource management with proper cleanup
+- Robust error handling and recovery mechanisms
+- Efficient batch processing with configurable sizes
+- Better memory management and cleanup procedures
+- Enhanced URL extraction and validation
+- Cleaner XML output format
+- Comprehensive logging and debugging capabilities
+- Browser instance reuse for better performance
+
+## Core Changes
+
+Major improvements have been made to these key files:
+- `crawler.js`: Enhanced with async/await, better error handling, and batch processing
+- `web.js`: Improved browser management, retry mechanisms, and resource cleanup
+- `files.js`: Modernized file operations and cleaner XML output
+- `rules.js`: More efficient URL filtering and validation
+- `server.js`: Added proper cleanup handlers and better resource management
+
+For detailed technical changes, see [changes_flag.md](./changes_flag.md).
+
 ### About
 
 Sitemaps are simple XML documents consisting of links of all pages in a website. This provides additional information about the page to search engine crawlers to categories the type of content and serve it to the users based on their search keywords. 
@@ -13,41 +39,78 @@ This Sitemap generator, built with `puppeteer (Google Chrome's Headless Chrome N
 
 `npm install`
 
-To start generating
+To start generating:
 
 `npm start`
 
-**config.js**
+**config.js Example**
 
 ```js
-module.exports  = {
-    base: 'https://www.xfinity.com', // website url
-    urls: [ // list of pages you want to crawl
-        'https://www.xfinity.com/mobile', 
-        'https://www.xfinity.com/mobile/plan',
-        'https://www.xfinity.com/mobile/byod',
-        'https://www.xfinity.com/mobile/support',
-        'https://www.xfinity.com/mobile/shop?category=device',
-        'https://www.xfinity.com/mobile/shop?category=accessories'
+module.exports = {
+    base: 'https://mujoco.readthedocs.io/en/stable/',
+    urls: [
+        'https://mujoco.readthedocs.io/en/stable/',
+        'https://mujoco.readthedocs.io/en/stable/overview.html'
     ],
-    strictPresence: 'www.xfinity.com/mobile/', // url will be added to xml only if this exists
-    ignoreStrings: [ // ignore any url that has these texts
-        'img.xfinity',
-        'styles.',
-        'm.me'
+    strictPresence: 'mujoco.readthedocs.io/en/stable/',
+    ignoreStrings: [
+        'genindex',
+        '_sources',
+        '_static',
+        'search.html',
+        'search?',
+        '_images/',
+        '.png',
+        '.gif',
+        '.jpg',
+        'rtd.io',
+        '#'
     ],
-    autoCrawl: false, // Recursive crawling functionality
-    crawlLevel: 0, // Recursive calling for pages upto 'x' levels
-    pageLoad: { // page load configuration
-        waitUntil: 'networkidle0',
-        timeout: 3000000
+    autoCrawl: false,
+    crawlLevel: 1,
+    pageLoad: {
+        waitUntil: 'networkidle2',
+        timeout: 100000,
+        retryLimit: 3
     },
-    disableHashRoutes: false, // disable routes with Hash in it
-    sortBy: 'asc' // 'asc' | 'dsc' | 'none'
+    disableHashRoutes: true,
+    sortBy: 'asc'
 }
 ```
 
-### Configurations
+### Enhanced Features
+
+1. **Modern JavaScript Implementation**
+   - Full async/await support
+   - Promise-based file operations
+   - Better parallel processing
+   - Configurable batch processing
+
+2. **Improved Browser Management**
+   - Browser instance reuse
+   - Proper cleanup on interruption
+   - Better resource management
+   - Configurable timeouts and retries
+
+3. **Enhanced Error Handling**
+   - Comprehensive try-catch blocks
+   - Retry mechanisms for failed requests
+   - Graceful error recovery
+   - Process cleanup on failures
+
+4. **Better URL Processing**
+   - Improved link extraction
+   - Better URL validation
+   - Efficient filtering mechanisms
+   - More reliable depth calculation
+
+5. **Performance Optimizations**
+   - Parallel batch processing
+   - Configurable crawl limits
+   - Memory usage improvements
+   - Reduced function call overhead
+
+### Original Configuration Options
 
 **base**
 
@@ -101,6 +164,8 @@ Avoids these urls
 `https://abc.com/#section2`
 `https://abc.com/#/section2`
 `https://abc.com/about#section4`
+
+
 
 
 ## License

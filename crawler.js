@@ -38,16 +38,30 @@ const crawler = {
 
     baseUrlHashes: config.base.split('/').length,
 
-    getXml(xmUrl, limit) {
-        log.log(`Queuing ${xmUrl}`);
-        webService.getWeb(xmUrl).then((data) => {
+    async getXml(xmUrl, limit) {
+        try {
+            //log.log(`Queuing ${xmUrl}`);
+            const data = await webService.getWeb(xmUrl);
             log.log(`Data received for ${xmUrl}`);
             this.counter = this.counter + 1;
             this.allUrls = _.union(this.allUrls, rulesService.checkRules(data));
-            if (this.counter === limit) {
-                filesService.createXml(rulesService.sortLinks(this.allUrls));
+            
+            if (this.counter >= limit) {
+                log.log('All URLs processed, creating sitemap...');
+                await filesService.createXml(rulesService.sortLinks(this.allUrls));
+                log.log('Sitemap created successfully!');
+                setTimeout(() => process.exit(0), 1000); // Give time for file writing
             }
-        });
+        } catch (error) {
+            console.error(`Failed processing ${xmUrl}: ${error.message}`);
+            this.counter = this.counter + 1;
+            if (this.counter >= limit) {
+                log.log('All URLs processed (with some errors), creating sitemap...');
+                await filesService.createXml(rulesService.sortLinks(this.allUrls));
+                log.log('Sitemap created successfully!');
+                setTimeout(() => process.exit(0), 1000);
+            }
+        }
     },
 
     /*
@@ -62,55 +76,69 @@ const crawler = {
     * 6. autoFetch again
     * 7. If processes are empty, create sitemap
     */
-    autoFetch() {
-        while (this.processes.length > 0) {
+    async autoFetch() {
+        if (this.processes.length === 0) {
+            log.log('No more URLs to process, creating sitemap...');
+            await filesService.createXml(rulesService.sortLinks(this.allUrls));
+            log.log('Sitemap created successfully!');
+            setTimeout(() => process.exit(0), 1000);
+            return;
+        }
 
-            // Remove url from 'process' array
-            const xmUrl = this.processes.pop();
-            log.log(`Queuing ${xmUrl}`);
-            
-            this.counter = this.counter + 1;
-
-            // Push the url to 'processCompleted'
+        // Use batchSize from config
+        const batchSize = config.pageLoad.batchSize || 5; // Default to 5 if not specified
+        const urlsToProcess = this.processes.splice(0, batchSize);
+        
+        // Create array of promises for parallel processing
+        const promises = urlsToProcess.map(async (xmUrl) => {
+            this.counter++;
             this.processesCompleted.push(xmUrl);
 
-            // Feed the base Url and fetch HTML
-            webService.getWeb(xmUrl).then((data) => {
-
+            try {
+                const data = await webService.getWeb(xmUrl);
                 log.log(`Data received for ${xmUrl}`);
                 const newUrls = rulesService.checkRules(data);
                 this.allUrls = _.union(this.allUrls, newUrls);
+                this.dataFetched++;
+                
+                await this.queueUrls(newUrls);
+            } catch (error) {
+                console.error(`Error processing ${xmUrl}:`, error);
+                this.dataFetched++;
+            }
+        });
 
-                log.log(`Data Queued ${this.counter} - Completed - ${this.dataFetched}`);
-                this.dataFetched = this.dataFetched + 1;
-                                
-                if ((this.counter === this.dataFetched) && this.counter !== 1) {
-                    filesService.createXml(rulesService.sortLinks(this.allUrls));
-                } else {
-                    this.queueUrls(newUrls);
-                }
-            });
+        // Wait for all URLs in batch to complete
+        await Promise.all(promises);
+
+        // Continue with next batch
+        if (this.processes.length > 0) {
+            await this.autoFetch();
+        } else if (this.counter === this.dataFetched) {
+            // All processing complete
+            log.log('No more URLs to process, creating sitemap...');
+            await filesService.createXml(rulesService.sortLinks(this.allUrls));
+            log.log('Sitemap created successfully!');
+            setTimeout(() => process.exit(0), 1000);
         }
     },
 
-    queueUrls(urls) {        
+    async queueUrls(urls) {        
         // Filter Urls already processed stored in 'processCompleted'
         const removingCompleted = _.uniq(_.without(urls, ...this.processesCompleted));
         const removingQueued = _.without(removingCompleted, ...this.processes);
 
-        const removingIngoreLevels = _.filter(removingQueued, (url) => url.split('/').length <= (this.baseUrlHashes + config.crawlLevel));
+        const removingIngoreLevels = _.filter(removingQueued, url => {
+            const urlDepth = url.split('/').length - this.baseUrlHashes;
+            return urlDepth <= config.crawlLevel;
+        });
+
         const urlsIgnored = _.difference(urls, removingIngoreLevels);
         this.processesCompleted.push(...urlsIgnored);
         this.processes = _.uniq([...this.processes, ...removingIngoreLevels]);
 
-        // Below line is temporary, only for testing purpose. _.repeat() is deprecated
-        try {
-            new parallel([this.autoFetch()]);
-        }
-        catch(e) {
-            console.log('Error occuring during parallel process');
-            console.log(e);
-        }
+        // Remove parallel processing which was causing issues
+        return Promise.resolve();
     }
 }
 

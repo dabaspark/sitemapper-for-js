@@ -18,20 +18,38 @@
 
 const config = require('../config');
 
-const Rules = {
+const rulesService = {
+    checkRules(urls) {
+        if (!urls || !Array.isArray(urls)) {
+            console.log('No valid URLs to process');
+            return [];
+        }
 
-    checkRules(hrefs) {
-        const urlsToReturn = [];
-        hrefs.forEach((url) => {
-            const urlToPush = url;
-            if (this.doNotIgnore(urlToPush)) {
-                urlsToReturn.push(urlToPush);
+        //console.log(`Processing ${urls.length} URLs through rules`);
+        
+        return urls.filter(url => {
+            // Must contain the strict presence string
+            const hasStrictPresence = url.includes(config.strictPresence);
+            
+            // Must not contain any of the ignore strings
+            const hasNoIgnoreStrings = !config.ignoreStrings.some(ignore => 
+                url.toLowerCase().includes(ignore.toLowerCase())
+            );
+
+            /*
+            // Log filtered URLs for debugging
+            if (!hasStrictPresence) {
+                console.log(`Filtered out (strictPresence): ${url}`);
             }
+            if (!hasNoIgnoreStrings) {
+                console.log(`Filtered out (ignoreStrings): ${url}`);
+            }
+            */
+
+            return hasStrictPresence && hasNoIgnoreStrings;
         });
-
-        return urlsToReturn;
     },
-
+    
     notExemptions(url) {
         for (let i = 0; i < config.ignoreStrings.length; i++) {
 
@@ -73,4 +91,4 @@ const Rules = {
     }
 }
 
-module.exports = Rules;
+module.exports = rulesService;

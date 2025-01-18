@@ -61,3 +61,8 @@ function startServer() {
         crawlBusiness();
     });
 }
+
+process.on('SIGINT', async () => {
+    await webService.cleanup();
+    process.exit(0);
+});
